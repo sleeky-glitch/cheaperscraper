@@ -5,13 +5,13 @@ import re
 from sentence_transformers import SentenceTransformer
 
 # Initialize Pinecone
-pinecone.init(api_key='YOUR_PINECONE_API_KEY', environment='YOUR_ENVIRONMENT')
+pinecone.init(pinecone_api_key)
 
 # Create a Pinecone index with the appropriate dimension (e.g., 768 for DistilBERT)
-index_name = 'your-index-name'
+index_name = 'tagscraper'
 dimension = 768  # Change this if you use a different model
 if index_name not in pinecone.list_indexes():
-  pinecone.create_index(index_name, dimension=dimension)
+  pinecone.create_index('tagscraper', dimension=768)
 
 index = pinecone.Index(index_name)
 
