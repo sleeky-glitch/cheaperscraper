@@ -2,10 +2,21 @@ import streamlit as st
 import pinecone
 import fitz  # PyMuPDF
 import re
+from sentence_transformers import SentenceTransformer
 
 # Initialize Pinecone
 pinecone.init(api_key='YOUR_PINECONE_API_KEY', environment='YOUR_ENVIRONMENT')
-index = pinecone.Index('your-index-name')
+
+# Create a Pinecone index with the appropriate dimension (e.g., 768 for DistilBERT)
+index_name = 'your-index-name'
+dimension = 768  # Change this if you use a different model
+if index_name not in pinecone.list_indexes():
+  pinecone.create_index(index_name, dimension=dimension)
+
+index = pinecone.Index(index_name)
+
+# Load a pre-trained model for generating embeddings
+model = SentenceTransformer('distilbert-base-nli-mean-tokens')
 
 # Function to extract text and its properties from PDF
 def extract_text_with_properties(pdf_file):
@@ -56,9 +67,13 @@ if uploaded_file is not None:
   # Identify news segments
   news_segments = identify_news_segments(text_segments)
 
-  # Store headlines in Pinecone
-  for segment in news_segments:
-      index.upsert([(segment['headline'], {'content': segment['content']})])  # Assuming segment has 'headline' and 'content'
+  # Generate embeddings for the headlines
+  headlines = [segment['headline'] for segment in news_segments]
+  embeddings = model.encode(headlines)
+
+  # Store headlines and their embeddings in Pinecone
+  for i, segment in enumerate(news_segments):
+      index.upsert([(segment['headline'], embeddings[i].tolist())])  # Convert numpy array to list
 
   st.success("Headlines stored in Pinecone!")
 
@@ -67,7 +82,9 @@ if uploaded_file is not None:
 
   if tag:
       # Query Pinecone for relevant news segments
-      results = index.query(filter={"tag": tag}, top_k=10)  # Adjust the query as per your index schema
+      query_embedding = model.encode([tag])[0].tolist()  # Convert tag to embedding
+      results = index.query(queries=[query_embedding], top_k=10)  # Adjust the query as per your index schema
       st.write("Relevant News Segments:")
       for result in results['matches']:
+          st.write(result['id'])  # Display the headline of the matched segments
           st.write(result['metadata']['content'])  # Display the content of the matched segments
